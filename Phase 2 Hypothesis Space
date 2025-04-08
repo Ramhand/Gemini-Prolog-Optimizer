@@ -1,0 +1,38 @@
+<clause> ::= <head> ":-" <body>.
+
+<head> ::= "corrected_label(" "E" "," "C" ")"
+
+<body> ::= <literal>
+        |  <literal> "," <body>
+
+<literal> ::= <predicate> "(" <arguments> ")"
+           | <comparison>
+
+<predicate> ::= "sup_vector" | "unsup_vector" | "region" | "cosine_dist" | "confidence" | "pred_class"
+             |  "actual_class" | "pos" | "neg" | "majority_class" | "region_avg_conf" | "knneighbourhood"
+             |  "knn_majority" | "knn_avg_confidence" | "knn_similarity"
+
+<comparison> ::= <var_or_const> "<" <var_or_const>
+              |  <var_or_const> ">" <var_or_const>
+              |  <var_or_const> "<=" <var_or_const>
+              |  <var_or_const> ">=" <var_or_const>
+
+<arguments> ::= <var_or_const> | <var_or_const> "," <arguments>
+
+<var_or_const>  ::= <variable> |  <constant>
+
+<variable> ::= "E"    /* example */
+             | "C"    /* class */
+             | "R"    /* region */
+             | "Conf" /* confidence scores */
+             | "V"    /* a vector (embedding) */
+             | "D"    /* distance or similarity*/
+             | "K"    /* k-nearest neighbour group */
+
+<constant> ::= <symbolic_constant> | <numeric_constant>
+
+<symbolic_constant> ::= "class0" | "class1" | "class2" | "class3" | "class4" | "class5" | "class6" | "class7" | "class8" | <region_constant>
+
+<region_constant> ::= [r][s|u][0-9]+
+
+<numeric_constant> ::= (-?[0-9]+(\.[0-9]+)?)|(-?\.[0-9]+)

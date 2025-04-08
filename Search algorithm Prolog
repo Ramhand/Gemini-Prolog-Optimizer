@@ -1,0 +1,91 @@
+learn_all_rules(Hypothesis) :-
+    gather_all_pos(Pos),
+    gather_all_neg(Neg),
+    learn_all_rules(Pos, Neg, [], Hypothesis)
+learn_all_rules([], _Neg, RulesSoFar, RulesSoFar) :- !.
+learn_all_rules(Pos, Neg, RulesSoFar, FinalRules) :-
+    search_for_rule(NewRule, Pos, Neg),
+    cover_positives(NewRule, Pos, Covered),
+    subtract(Pos, Covered, RemainingPos),
+    learn_all_rules(RemainingPos, Neg, [NewRule|RulesSoFar], FinalRules).
+
+search_for_rule((corrected_label(E,C) :- Body), Pos, Neg) :-
+    max_depth(MaxD),
+    best_rule((corrected_label(E,C) :- true), Body, MaxD, 0, _BestScore, Pos, Neg).
+
+best_rule((Head :- Body), Body, _, BestScore, BestScore, _Pos, _Neg) :-
+    !.
+
+best_rule((Head :- CurrentBody), FinalBody, Depth, CurrentScore, FinalScore, Pos, Neg) :-
+    Depth > 0,
+    candidate_literal(Lit),
+    \+ literal_in_body(Lit, CurrentBody),
+    append_body(CurrentBody, Lit, NewBody),
+    coverage_score((Head :- NewBody), Score, Pos, Neg),
+    ( Score > CurrentScore
+      -> best_rule((Head :- NewBody), TempBody, Depth - 1, Score, FinalScore, Pos, Neg),
+         FinalBody = TempBody
+      ;
+         fail
+      ).
+
+:- table coverage_score/2
+
+coverage_score((corrected_label(E,C) :- Body), Score, Pos, Neg) :-
+    findall((E,C),
+        (member((E, C), Pos),
+        call_body(Body, E, C)),
+        PosCovered),
+    length(PosCovered, Pcount),
+    findall((E,C),
+        (member((E,C), Neg),
+        call_body(Body, E, C)),
+        NegCovered),
+    length(NegCovered, Ncount),
+    Score is Pcount - Ncount
+
+call_body(true, _, _) :- !.
+call_body((Lit, Rest), E, C) :-
+    call(Lit),
+    call_body(Rest, E, C).
+call_body(Lit, _, _) :-
+    call(Lit).
+
+literal_signature((confidence(E, C, Val), Val < T), signature(confidence, E, C)) :- !.
+literal_signature(in_cluster(E, R), signature(in_cluster, E)) :- !.
+literal_signature(majority_class(R, MClass), signature(majority_class, R)) :- !.
+literal_signature(pred_class(E, C), signature(pred_class, E)) :- !
+literal_signature(knn_majority(E, 10, MClass), signature(knn_majority, E, 10)) :- !.
+literal_signature(knn_avg_confidence(E, 10, C, AvgC), signature(knn_avg_confidence, E, 10, C)) :- !.
+literal_signature(knn_similarity(E, 10, Sim), signature(knn_similarity, E, 10)) :- !.
+
+candidate_literal(Lit),
+    \+ literal_in_body(Lit, CurrentBody)
+candidate_literal(in_cluster(E, R)) :-
+    region(R).
+candidate_literal(majority_class(R, MClass)) :-
+    region(R).
+candidate_literal((confidence(E, C, Val), Val < T)) :-
+    class(C),
+    conf_threshold(T).
+candidate_literal(pred_class(E, C)) :-
+    class(C).
+candidate_literal(knn_majority(E, 10, MClass)) :-
+    class(MClass).
+candidate_literal(knn_avg_confidence(E, 10, C, AvgC)) :-
+    class(C).
+candidate_literal(knn_similarity(E, 10, Sim)).
+% Keep adding candidate_literal's
+
+literal_in_body(Lit, (ExistingLit, _)) :-
+    literal_signature(Lit, Sig1),
+    literal_signature(ExistingLit, Sig2),
+    Sig1 == Sig2,
+    !.
+literal_in_body(Lit, (_, Rest)) :- literal_in_body(Lit, Rest).
+literal_in_body(_, true) :- fail.
+
+append_body(true, Lit, Lit) :- !.
+append_body(Body, Lit, (Body, Lit)).
+
+max_depth(5)
